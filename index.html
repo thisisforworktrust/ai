@@ -1,276 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <title>Pro AI Local</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        /* Modern Reset & Base */
-        body { 
-            background-color: #0f1115; 
-            color: #ececf1; 
-            font-family: 'Inter', sans-serif;
-            overflow: hidden; /* Prevent body scroll, handle in chat box */
-        }
+<meta charset="UTF-8">
+<title>BEEF.AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #3e3e41; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-
-        /* Chat Bubbles */
-        .msg-enter { animation: slideIn 0.3s ease-out forwards; opacity: 0; transform: translateY(10px); }
-        @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
-
-        .user-bubble { background-color: #3b82f6; color: white; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        .ai-bubble { background-color: #2a2b32; color: #ececf1; border-radius: 18px 18px 18px 4px; border: 1px solid #3e3e41; }
-        
-        /* Loading Animation */
-        .dot-flashing {
-            position: relative; width: 6px; height: 6px; border-radius: 5px; background-color: #9ca3af; color: #9ca3af;
-            animation: dot-flashing 1s infinite linear alternate; animation-delay: 0.5s;
-        }
-        .dot-flashing::before, .dot-flashing::after {
-            content: ''; display: inline-block; position: absolute; top: 0;
-            width: 6px; height: 6px; border-radius: 5px; background-color: #9ca3af; color: #9ca3af;
-            animation: dot-flashing 1s infinite alternate;
-        }
-        .dot-flashing::before { left: -10px; animation-delay: 0s; }
-        .dot-flashing::after { left: 10px; animation-delay: 1s; }
-        @keyframes dot-flashing { 0% { background-color: #9ca3af; } 50%, 100% { background-color: #4b5563; } }
-
-        /* Glassmorphism Header */
-        .glass-header {
-            background: rgba(15, 17, 21, 0.85);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid #2a2b32;
-        }
-    </style>
+<style>
+body{background:#09090b;color:#e4e4e7;font-family:Inter,sans-serif;overflow:hidden}
+#chat-box{scroll-behavior:smooth}
+#chat-box::-webkit-scrollbar{width:6px}
+#chat-box::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}
+.msg{padding:12px 16px;border-radius:12px;font-size:.95rem;max-width:85%; word-wrap: break-word;}
+.ai-msg{background:#18181b;border:1px solid #27272a;color:#d4d4d4;margin-right:auto}
+.user-msg{background:#2563eb;color:white;margin-left:auto;text-align:right}
+</style>
 </head>
+
 <body class="flex flex-col h-screen">
 
-    <header class="glass-header fixed top-0 w-full z-10 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-purple-500/20">
-                AI
-            </div>
-            <div>
-                <h1 class="font-semibold text-sm tracking-wide text-white">TinyLlama 1.1B</h1>
-                <div class="flex items-center gap-1.5">
-                    <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-500"></span>
-                    <span id="status-text" class="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Offline</span>
-                </div>
-            </div>
-        </div>
-        <div class="text-[10px] bg-[#1c1c21] text-gray-400 px-2 py-1 rounded border border-[#2a2b32]">
-            High IQ • Low RAM
-        </div>
-    </header>
+<div class="border-b border-zinc-800 bg-zinc-950 p-4 flex justify-between items-center">
+  <h1 class="font-bold text-white tracking-tight">BEEF.<span class="text-green-500">AI</span></h1>
+  <div id="status" class="text-xs font-mono text-yellow-500">INITIALIZING...</div>
+</div>
 
-    <main id="chat-container" class="flex-1 overflow-y-auto pt-24 pb-32 px-4 max-w-3xl mx-auto w-full">
-        
-        <div id="welcome-screen" class="flex flex-col items-center justify-center h-full text-center space-y-6">
-            <div class="w-16 h-16 rounded-2xl bg-[#1c1c21] border border-[#2a2b32] flex items-center justify-center mb-2">
-                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-            </div>
-            <h2 class="text-2xl font-bold text-white">Local Intelligence</h2>
-            <p class="text-gray-500 text-sm max-w-xs">
-                This model runs entirely in your browser. It does not send data to the cloud.
-            </p>
-            
-            <button id="init-btn" class="group relative bg-white text-black px-8 py-3 rounded-full font-semibold text-sm hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300">
-                <span id="btn-text">Load System (600MB)</span>
-                <div id="btn-progress" class="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300 rounded-full" style="width: 0%"></div>
-            </button>
-            
-            <div class="text-[10px] text-gray-600">
-                Optimized for Chrome & Edge
-            </div>
-        </div>
+<div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
+  <div class="ai-msg msg">Chat With BEEF</div>
+</div>
 
-        <div id="messages" class="hidden flex flex-col space-y-6"></div>
+<div class="p-4 bg-zinc-950 border-t border-zinc-800">
+  <div class="flex gap-2 max-w-3xl mx-auto">
+    <input id="user-input" type="text" disabled placeholder="Type a message..."
+      class="flex-1 bg-zinc-900 border border-zinc-700 text-white rounded-lg px-4 py-3 focus:outline-none">
+    <button id="send-btn" disabled
+      class="bg-blue-600 hover:bg-blue-500 text-white px-6 rounded-lg font-bold disabled:opacity-50">
+      Send
+    </button>
+  </div>
+</div>
 
-    </main>
+<script type="module">
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
-    <footer class="fixed bottom-0 w-full bg-gradient-to-t from-[#0f1115] via-[#0f1115] to-transparent pt-10 pb-6 px-4">
-        <div class="max-w-3xl mx-auto relative">
-            <input type="text" id="user-input" disabled 
-                placeholder="Type your message..." 
-                class="w-full bg-[#1c1c21] text-white border border-[#2a2b32] rounded-xl pl-5 pr-12 py-4 shadow-2xl focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-            
-            <button id="send-btn" disabled 
-                class="absolute right-2 top-2 bottom-2 bg-[#2a2b32] hover:bg-blue-600 text-gray-400 hover:text-white px-3 rounded-lg transition-colors disabled:opacity-0">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </button>
-        </div>
-        <div class="text-center mt-3">
-             <span class="text-[10px] text-gray-600">Generated by TinyLlama-1.1B • Memory Saver Active</span>
-        </div>
-    </footer>
+// 1. Force Local Models off (saves downloading unnecessary configs)
+env.allowLocalModels = false;
+env.useBrowserCache = true;
 
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+const status = document.getElementById('status');
+const chatBox = document.getElementById('chat-box');
+const userInput = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
 
-        // CONFIGURATION
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
+let generator;
+// 2. Strict History Cap (We will never store more than 6 items here)
+let history = []; 
 
-        // DOM Elements
-        const initBtn = document.getElementById('init-btn');
-        const btnText = document.getElementById('btn-text');
-        const btnProgress = document.getElementById('btn-progress');
-        const welcomeScreen = document.getElementById('welcome-screen');
-        const messagesDiv = document.getElementById('messages');
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-        const statusText = document.getElementById('status-text');
-        const statusDot = document.getElementById('status-dot');
-        const chatContainer = document.getElementById('chat-container');
+async function init() {
+  try {
+    // Loading the quantized version is crucial for RAM
+    generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
+      quantized: true, 
+      progress_callback: d => {
+        if(d.status === 'progress') status.innerText = `DL: ${Math.round(d.progress)}%`;
+      }
+    });
+    status.innerText = "ONLINE";
+    status.classList.replace('text-yellow-500', 'text-green-500');
+    userInput.disabled = false;
+  } catch (e) {
+    status.innerText = "ERROR";
+    console.error(e);
+  }
+}
 
-        let generator;
+function addMessage(text, isUser = false) {
+  const d = document.createElement("div");
+  d.className = isUser ? "msg user-msg" : "msg ai-msg";
+  d.innerText = text;
+  chatBox.appendChild(d);
+  chatBox.scrollTop = chatBox.scrollHeight;
 
-        // 1. INITIALIZE ENGINE
-        initBtn.addEventListener('click', async () => {
-            initBtn.disabled = true;
-            statusText.innerText = "Downloading...";
-            statusDot.className = "w-2 h-2 rounded-full bg-yellow-500 animate-pulse";
+  // 3. DOM Cleanup: If more than 30 messages, remove the oldest one to save RAM
+  if (chatBox.children.length > 30) {
+    chatBox.removeChild(chatBox.firstChild);
+  }
+  return d;
+}
 
-            try {
-                // Load Model
-                generator = await pipeline('text-generation', 'Xenova/TinyLlama-1.1B-Chat-v1.0', {
-                    quantized: true,
-                    progress_callback: (data) => {
-                        if (data.status === 'progress') {
-                            const pct = Math.round(data.progress);
-                            btnText.innerText = `Loading... ${pct}%`;
-                            btnProgress.style.width = `${pct}%`;
-                        }
-                    }
-                });
+async function handleChat() {
+  const text = userInput.value.trim();
+  if (!text) return;
 
-                // Transition UI
-                statusText.innerText = "Active";
-                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
-                
-                welcomeScreen.style.display = 'none';
-                messagesDiv.classList.remove('hidden');
-                
-                // Add Intro Message
-                addMessage('ai', "I am online. I am optimized for low memory usage. How can I help you?");
-                
-                userInput.disabled = false;
-                userInput.focus();
+  addMessage(text, true);
+  userInput.value = "";
+  userInput.disabled = true;
+  sendBtn.disabled = true;
 
-            } catch (err) {
-                statusText.innerText = "Error";
-                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
-                btnText.innerText = "Error - Retry?";
-                initBtn.disabled = false;
-                console.error(err);
-            }
-        });
+  // 4. Memory Management: Trim history array if it gets too big
+  if (history.length > 6) {
+      history = history.slice(-6);
+  }
 
-        // 2. CHAT LOGIC
-        async function handleChat() {
-            const text = userInput.value.trim();
-            if (!text) return;
+  // Build prompt
+  let prompt = `<|im_start|>system\nYou are a logical assistant. Answer casually.<|im_end|>\n`;
+  
+  // Only feed the last 2 exchanges to the AI to keep context small
+  history.slice(-2).forEach(m => {
+    prompt += `<|im_start|>user\n${m.user}<|im_end|>\n<|im_start|>assistant\n${m.ai}<|im_end|>\n`;
+  });
+  prompt += `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
 
-            // UI Updates
-            userInput.value = '';
-            userInput.disabled = true;
-            sendBtn.disabled = true;
-            addMessage('user', text);
+  const loadingMsg = addMessage("Thinking...");
 
-            // Construct Prompt (Optimized for Short Context)
-            const prompt = `<|system|>\nYou are a helpful AI.\n<|user|>\n${text}\n<|assistant|>\n`;
+  try {
+    const out = await generator(prompt, {
+      max_new_tokens: 120,
+      temperature: 0.6,
+      do_sample: true,
+      // 5. CRITICAL: Disable Cache. 
+      // This prevents the AI from storing massive key/value tensors in RAM.
+      use_cache: false 
+    });
 
-            // Add Typing Indicator
-            const loadingId = addTypingIndicator();
+    let raw = out[0].generated_text;
 
-            try {
-                const output = await generator(prompt, {
-                    max_new_tokens: 150,
-                    use_cache: false, // CRITICAL: Saves RAM
-                    temperature: 0.7,
-                    do_sample: true
-                });
+    // --- AGGRESSIVE CLEANING ---
+    const keyword = "assistant";
+    const lastIndex = raw.lastIndexOf(keyword);
 
-                // Process Output
-                const raw = output[0].generated_text;
-                const answer = raw.split('<|assistant|>')[1] || "I couldn't generate a response.";
+    let answer = raw;
+    if (lastIndex !== -1) {
+        answer = raw.substring(lastIndex + keyword.length);
+    }
 
-                // Replace Typing Indicator
-                removeMessage(loadingId);
-                addMessage('ai', answer.trim());
+    answer = answer.replace(/^[:\s\n]+/, "");
+    answer = answer.replace(/<\|im_end\|>/g, "");
+    // ---------------------------
 
-            } catch (err) {
-                removeMessage(loadingId);
-                addMessage('ai', "Error: System memory full. Try refreshing.");
-            }
+    loadingMsg.innerText = answer.trim();
+    history.push({ user: text, ai: answer.trim() });
+    
+    // 6. Manual cleanup suggestion for JS engine
+    raw = null; 
+    answer = null;
 
-            userInput.disabled = false;
-            userInput.focus();
-        }
+  } catch (e) {
+    loadingMsg.innerText = "Error: " + e.message;
+  }
 
-        // 3. UI HELPERS
-        function addMessage(role, text) {
-            const div = document.createElement('div');
-            div.className = `flex w-full msg-enter ${role === 'user' ? 'justify-end' : 'justify-start'}`;
-            
-            const bubble = document.createElement('div');
-            bubble.className = `px-5 py-3 text-sm leading-relaxed max-w-[85%] ${role === 'user' ? 'user-bubble' : 'ai-bubble'}`;
-            
-            // Format Text (Simple Line Breaks)
-            bubble.innerHTML = text.replace(/\n/g, '<br>');
-            
-            div.appendChild(bubble);
-            messagesDiv.appendChild(div);
-            scrollToBottom();
-            return div.id;
-        }
+  userInput.disabled = false;
+  sendBtn.disabled = false;
+  userInput.focus();
+}
 
-        function addTypingIndicator() {
-            const id = 'typing-' + Date.now();
-            const div = document.createElement('div');
-            div.id = id;
-            div.className = "flex w-full justify-start msg-enter";
-            div.innerHTML = `
-                <div class="px-5 py-4 bg-[#2a2b32] rounded-[18px] border border-[#3e3e41] flex items-center gap-1">
-                    <div class="dot-flashing"></div>
-                </div>
-            `;
-            messagesDiv.appendChild(div);
-            scrollToBottom();
-            return id;
-        }
+sendBtn.onclick = handleChat;
+userInput.onkeydown = e => { if(e.key === "Enter") handleChat(); }
+userInput.oninput = () => sendBtn.disabled = !userInput.value.trim();
 
-        function removeMessage(id) {
-            const el = document.getElementById(id);
-            if (el) el.remove();
-        }
-
-        function scrollToBottom() {
-            // Scroll the container, not the window
-            setTimeout(() => {
-                chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
-            }, 50);
-        }
-
-        // Events
-        sendBtn.addEventListener('click', handleChat);
-        userInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleChat();
-            }
-        });
-        userInput.addEventListener('input', () => {
-            sendBtn.disabled = userInput.value.trim() === '';
-        });
-
-    </script>
+init();
+</script>
 </body>
 </html>
