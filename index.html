@@ -3,164 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>High Contrast AI</title>
+    <title>Math AI Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* High Contrast Theme */
-        body { background-color: #000000; color: #ffffff; font-family: sans-serif; }
+        body { background-color: #f3f4f6; color: #1f2937; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
-        /* Chat Box */
         #chat-box { 
-            height: 65vh; 
+            height: 60vh; 
             overflow-y: auto; 
-            border: 2px solid #333;
-            background-color: #111;
-            padding: 20px;
-            border-radius: 10px;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+            padding: 24px;
         }
 
-        /* Message Bubbles */
-        .msg { padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; max-width: 85%; word-wrap: break-word; }
-        .user-msg { background-color: #2563eb; color: #ffffff; margin-left: auto; text-align: right; }
-        .ai-msg { background-color: #333333; color: #00ff00; margin-right: auto; text-align: left; border: 1px solid #444; }
+        .output-block { 
+            background-color: #eff6ff; 
+            border-left: 4px solid #3b82f6;
+            padding: 16px; 
+            margin-top: 16px;
+            border-radius: 0 8px 8px 0;
+        }
         
-        /* Error/Status */
-        .status-log { color: #ffff00; font-family: monospace; font-size: 12px; margin-bottom: 5px; }
+        .equation { font-family: 'Courier New', monospace; font-weight: bold; color: #d946ef; }
     </style>
 </head>
-<body class="p-4 flex flex-col h-screen max-w-3xl mx-auto">
+<body class="p-6 flex flex-col h-screen max-w-2xl mx-auto">
 
-    <div class="mb-4 text-center">
-        <h1 class="text-2xl font-bold text-white">Local AI (Fixed)</h1>
-        <p class="text-gray-400 text-sm">Status Log:</p>
-        <div id="status" class="status-log">Initializing...</div>
-    </div>
-
-    <div id="chat-box">
-        <div class="ai-msg msg">
-            SYSTEM: I am ready. If I produce text, it will appear here in GREEN.
+    <div class="mb-6">
+        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Math Solver AI</h1>
+        <div class="flex items-center gap-2 mt-2">
+            <span id="status-dot" class="w-2 h-2 rounded-full bg-yellow-400"></span>
+            <span id="status" class="text-sm font-medium text-gray-500">Initializing Math Engine...</span>
         </div>
     </div>
 
-    <div class="flex gap-2 mt-4">
-        <input type="text" id="user-input" placeholder="Type here..." disabled
-            class="flex-1 bg-gray-800 text-white border border-gray-600 rounded px-4 py-3 focus:outline-none focus:border-blue-500">
+    <div id="chat-box" class="mb-6">
+        <div class="text-gray-400 text-center mt-20">
+            Waiting for a problem...<br>
+            <span class="text-xs">(Examples: "Solve 2x + 5 = 15" or "What is the square root of 144?")</span>
+        </div>
+    </div>
+
+    <div class="flex gap-3">
+        <input type="text" id="user-input" placeholder="Type a math problem..." disabled
+            class="flex-1 bg-white border border-gray-300 shadow-sm rounded-lg px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
         <button id="send-btn" disabled
-            class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold disabled:opacity-50">
-            Send
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-lg shadow-md transition transform active:scale-95 disabled:opacity-50 disabled:transform-none">
+            Solve
         </button>
     </div>
 
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
-        // Settings to force it to run
+        // Force browser execution
         env.allowLocalModels = false;
         env.useBrowserCache = true;
 
         const status = document.getElementById('status');
+        const statusDot = document.getElementById('status-dot');
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         
         let generator;
-        let messages = [
-            { role: "system", content: "You are a helpful assistant. Keep answers short." }
-        ];
 
-        // 1. Initialize
+        // ==========================================
+        // 🧮 MATH INSTRUCTIONS
+        // ==========================================
+        const SYSTEM_PROMPT = "You are a strict Math Solver. You do not chat. You only solve the equation provided. Show the step-by-step solution clearly.";
+        // ==========================================
+
         async function init() {
             try {
-                status.innerText = "Downloading Model (Qwen 0.5B)... this takes a minute.";
-                
+                // Using Qwen again as it handles logic well
                 generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
                     quantized: true,
                     progress_callback: (data) => {
                         if (data.status === 'progress') {
-                            status.innerText = `Downloading: ${Math.round(data.progress)}%`;
+                            status.innerText = `Loading Engine: ${Math.round(data.progress)}%`;
                         }
                     }
                 });
 
-                status.innerText = "READY. Type a message below.";
-                status.style.color = "#00ff00"; // Green for ready
+                status.innerText = "Engine Ready";
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
                 userInput.disabled = false;
                 sendBtn.disabled = false;
                 userInput.focus();
 
             } catch (err) {
-                status.innerText = "ERROR: " + err.message;
-                status.style.color = "red";
+                status.innerText = "Error loading engine";
+                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                console.error(err);
             }
         }
 
-        // 2. Chat Logic
-        async function handleChat() {
-            const text = userInput.value.trim();
-            if (!text) return;
+        async function solveMath() {
+            const problem = userInput.value.trim();
+            if (!problem) return;
 
-            // Show User Message
-            addMessage(text, 'user');
+            // Clear Input
             userInput.value = '';
             userInput.disabled = true;
 
-            // Update memory
-            messages.push({ role: "user", content: text });
+            // UI Update: Show User's Problem
+            // Note: We use innerHTML = ... to clear previous answers. No history!
+            chatBox.innerHTML = `
+                <div class="text-xl font-bold text-gray-800 border-b pb-4 mb-4">
+                    Q: <span class="equation">${problem}</span>
+                </div>
+                <div id="loader" class="text-blue-600 animate-pulse font-medium">Calculating...</div>
+            `;
 
-            // Create Prompt
+            // Construct FRESH prompt (No History)
+            const messages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: problem }
+            ];
+
             const prompt = generator.tokenizer.apply_chat_template(messages, {
                 tokenize: false,
                 add_generation_prompt: true,
             });
 
-            // Show Loading Bubble
-            const loadingId = addMessage("Thinking...", 'ai');
-
             try {
                 const output = await generator(prompt, {
-                    max_new_tokens: 100,
-                    do_sample: true,
-                    temperature: 0.6,
+                    max_new_tokens: 256, // Allow space for steps
+                    do_sample: false,    // False = More precise/deterministic for math
+                    temperature: 0.1,    // Low temp = Less creative, more logical
                 });
 
-                // CAREFUL EXTRACTION
-                let rawText = output[0].generated_text;
-                let cleanText = rawText;
-
-                // Attempt to remove the prompt from the answer so we don't see double
-                if (rawText.startsWith(prompt)) {
-                    cleanText = rawText.substring(prompt.length);
-                } 
-                // Fallback: If substring failed, just show everything but try to hide system tags
-                cleanText = cleanText.replace(/<\|im_start\|>.*?<\|im_end\|>/g, '');
-
-                // Update the loading bubble with real text
-                const loadingDiv = document.getElementById(loadingId);
-                loadingDiv.innerText = cleanText || "[AI returned empty response]";
+                let answer = output[0].generated_text;
                 
-                messages.push({ role: "assistant", content: cleanText });
+                // Clean up the prompt from the answer
+                if (answer.startsWith(prompt)) {
+                    answer = answer.substring(prompt.length);
+                }
+
+                // Format the answer nicely
+                answer = answer.replace(/\n/g, '<br>');
+
+                const loader = document.getElementById('loader');
+                loader.className = "output-block text-gray-800 leading-relaxed";
+                loader.innerHTML = `<strong>Solution:</strong><br><br>${answer}`;
 
             } catch (err) {
-                document.getElementById(loadingId).innerText = "Error: " + err.message;
+                document.getElementById('loader').innerText = "Calculation Error.";
             }
             
             userInput.disabled = false;
             userInput.focus();
         }
 
-        function addMessage(text, sender) {
-            const div = document.createElement('div');
-            const id = "msg-" + Date.now();
-            div.id = id;
-            div.className = `msg ${sender === 'user' ? 'user-msg' : 'ai-msg'}`;
-            div.innerText = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return id;
-        }
-
-        sendBtn.addEventListener('click', handleChat);
-        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleChat(); });
+        sendBtn.addEventListener('click', solveMath);
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') solveMath(); });
 
         init();
     </script>
