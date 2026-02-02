@@ -3,157 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Local Browser AI</title>
+    <title>My Custom Trained AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #chat-box { height: 60vh; overflow-y: auto; scroll-behavior: smooth; }
-        /* Custom scrollbar for a tech feel */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
-        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 4px; }
+        /* Matrix-style aesthetic */
+        body { background-color: #0d1117; color: #c9d1d9; font-family: 'Courier New', Courier, monospace; }
+        #chat-box { height: 65vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #30363d #0d1117; }
+        .user-msg { border: 1px solid #238636; color: #238636; text-align: right; }
+        .ai-msg { border: 1px solid #58a6ff; color: #58a6ff; text-align: left; }
     </style>
 </head>
-<body class="bg-gray-900 text-white font-sans flex items-center justify-center min-h-screen p-4">
+<body class="p-4 flex flex-col h-screen max-w-4xl mx-auto">
 
-    <div class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-700">
-        
-        <div class="bg-gray-900 p-4 border-b border-gray-700 flex justify-between items-center">
-            <div>
-                <h1 class="text-xl font-bold text-blue-400 flex items-center gap-2">
-                    <span>🧠</span> Local Browser AI
-                </h1>
-                <p class="text-xs text-gray-500 mt-1">Runs 100% on your device. No data leaves this tab.</p>
-            </div>
-            <div id="status-dot" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div>
-        </div>
+    <div class="border-b border-gray-700 pb-4 mb-4">
+        <h1 class="text-xl font-bold text-green-400">Local Neural Net</h1>
+        <p class="text-xs text-gray-500">Model: Qwen1.5-0.5B-Chat (Runs in browser)</p>
+        <div id="status" class="text-yellow-500 text-xs mt-2">Status: Sleeping...</div>
+    </div>
 
-        <div id="chat-box" class="p-4 space-y-4 bg-gray-800">
-            <div class="bg-blue-900/30 border border-blue-500/30 p-3 rounded-lg text-sm text-blue-200">
-                <strong>System:</strong> Initializing AI Model (LaMini-Flan-T5). Please wait...
-                <br>
-                <span id="progress-text" class="text-xs opacity-70">0% loaded</span>
-                <div class="w-full bg-gray-700 h-1 mt-2 rounded overflow-hidden">
-                    <div id="progress-bar" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="p-4 bg-gray-900 border-t border-gray-700 flex gap-2">
-            <input type="text" id="user-input" placeholder="Loading AI model..." 
-                class="flex-1 bg-gray-800 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-            <button id="send-btn" 
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                Send
-            </button>
+    <div id="chat-box" class="flex-1 space-y-4 p-4 border border-gray-800 rounded-lg bg-[#161b22] mb-4">
+        <div class="text-gray-600 italic text-center text-sm">
+            Initializing neural pathways...<br>
+            (First load takes ~1 min. Please wait.)
         </div>
     </div>
 
+    <div class="flex gap-2">
+        <input type="text" id="user-input" placeholder="Loading model..." disabled
+            class="flex-1 bg-[#0d1117] border border-gray-700 rounded px-4 py-3 focus:outline-none focus:border-green-500 transition">
+        <button id="send-btn" disabled
+            class="bg-green-700 hover:bg-green-600 text-white px-6 py-2 rounded font-bold transition disabled:opacity-50">
+            Run
+        </button>
+    </div>
+
     <script type="module">
-        // Using the stable Xenova version which is more reliable for static HTML
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
 
-        // Skip local model checks to avoid errors in browser
+        // SETTINGS
         env.allowLocalModels = false;
         env.useBrowserCache = true;
 
+        // ==========================================
+        // 🧠 TRAINING DATA (EDIT THIS AREA)
+        // ==========================================
+        const SYSTEM_PROMPT = `
+            You are a cynical, sarcastic AI robot named "Glitch".
+            You prefer short answers.
+            You know a lot about HTML and Coding.
+            If someone asks "Who made you?", say "I made myself."
+            Current Date: 2024.
+        `;
+        // ==========================================
+
+        // Variables
+        const status = document.getElementById('status');
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        const statusDot = document.getElementById('status-dot');
-
+        
         let generator;
+        // This array is the "Brain" that stores the conversation
+        let messages = [
+            { role: "system", content: SYSTEM_PROMPT }
+        ];
 
-        // Helper: Add message to chat
-        function addMessage(text, sender) {
-            const div = document.createElement('div');
-            const isUser = sender === 'user';
-            div.className = isUser ? "flex justify-end" : "flex justify-start";
-            
-            div.innerHTML = `
-                <div class="max-w-[80%] rounded-2xl px-4 py-2 ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}">
-                    <div class="text-xs opacity-50 mb-1">${isUser ? 'You' : 'AI'}</div>
-                    <div class="leading-relaxed">${text}</div>
-                </div>
-            `;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        async function initAI() {
+        // 1. Load the AI
+        async function init() {
             try {
-                // We use 'text2text-generation' with a T5 model because it's lighter and more stable in-browser than pure GPT models
-                generator = await pipeline('text2text-generation', 'Xenova/LaMini-Flan-T5-248M', {
+                status.innerText = "Status: Downloading Model (280MB)...";
+                
+                // Qwen1.5-0.5B is smarter than T5 and supports "System Prompts" better
+                generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
+                    quantized: true, // Makes it smaller
                     progress_callback: (data) => {
                         if (data.status === 'progress') {
-                            const percent = Math.round(data.progress);
-                            progressBar.style.width = `${percent}%`;
-                            progressText.innerText = `Downloading components: ${percent}%`;
+                            status.innerText = `Status: Loading... ${Math.round(data.progress)}%`;
                         }
                     }
                 });
 
-                // AI is Ready
-                progressBar.parentElement.parentElement.remove(); // Remove loading bar
-                addMessage("I am ready! I'm running locally on your CPU. Ask me anything.", 'ai');
-                
+                status.innerText = "Status: Online (Ready)";
+                status.className = "text-green-500 text-xs mt-2";
                 userInput.disabled = false;
                 sendBtn.disabled = false;
-                userInput.placeholder = "Type your message...";
-                userInput.focus();
-                statusDot.classList.replace('bg-yellow-500', 'bg-green-500');
-                statusDot.classList.remove('animate-pulse');
+                userInput.placeholder = "Enter command...";
+                
+                // Clear initial loading text
+                chatBox.innerHTML = '<div class="text-gray-500 text-center text-xs mb-4">-- SYSTEM READY --</div>';
 
             } catch (err) {
-                progressText.innerText = "Error: " + err.message;
-                progressText.classList.add('text-red-500');
+                status.innerText = "Error: " + err.message;
                 console.error(err);
             }
         }
 
+        // 2. Chat Logic
         async function handleChat() {
             const text = userInput.value.trim();
             if (!text) return;
 
-            addMessage(text, 'user');
+            // Add User to UI
+            chatBox.innerHTML += `<div class="p-2 rounded mb-2 user-msg ml-auto max-w-[80%]">${text}</div>`;
             userInput.value = '';
             userInput.disabled = true;
-            
-            // Show typing indicator
-            const typingDiv = document.createElement('div');
-            typingDiv.id = "typing-indicator";
-            typingDiv.className = "flex justify-start";
-            typingDiv.innerHTML = `<div class="bg-gray-700 rounded-2xl rounded-bl-none px-4 py-3 flex gap-1 items-center"><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100"></span><span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200"></span></div>`;
-            chatBox.appendChild(typingDiv);
+
+            // Update Memory
+            messages.push({ role: "user", content: text });
+
+            // Create Prompt for the AI
+            // We have to format it manually because we are raw-dogging the model
+            const prompt = generator.tokenizer.apply_chat_template(messages, {
+                tokenize: false,
+                add_generation_prompt: true,
+            });
+
+            // Add "Typing..."
+            const loadingId = "loading-" + Date.now();
+            chatBox.innerHTML += `<div id="${loadingId}" class="p-2 rounded mb-2 ai-msg mr-auto max-w-[80%] animate-pulse">Computing...</div>`;
             chatBox.scrollTop = chatBox.scrollHeight;
 
             // Generate
-            try {
-                const output = await generator(text, {
-                    max_new_tokens: 100,
-                    temperature: 0.7,
-                    repetition_penalty: 1.2
-                });
+            const output = await generator(prompt, {
+                max_new_tokens: 128,
+                temperature: 0.7,
+                do_sample: true,
+                top_k: 50,
+            });
 
-                document.getElementById('typing-indicator').remove();
-                addMessage(output[0].generated_text, 'ai');
-            } catch (err) {
-                document.getElementById('typing-indicator').remove();
-                addMessage("Error generating response.", 'ai');
-            }
+            // Clean up response
+            // The model returns the WHOLE conversation, we just want the new part
+            let aiText = output[0].generated_text;
+            // Remove the prompt part to get just the answer
+            aiText = aiText.substring(prompt.length); 
+
+            // Remove loading, add real text
+            document.getElementById(loadingId).remove();
+            chatBox.innerHTML += `<div class="p-2 rounded mb-2 ai-msg mr-auto max-w-[80%]">${aiText}</div>`;
+            
+            // Update Memory with AI response
+            messages.push({ role: "assistant", content: aiText });
             
             userInput.disabled = false;
             userInput.focus();
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         sendBtn.addEventListener('click', handleChat);
-        userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleChat();
-        });
+        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleChat(); });
 
-        // Start
-        initAI();
+        init();
     </script>
 </body>
 </html>
