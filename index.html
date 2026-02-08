@@ -2,163 +2,182 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>BEEF.AI</title>
+<title>Beef AI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
-body{background:#09090b;color:#e4e4e7;font-family:Inter,sans-serif;overflow:hidden}
-#chat-box{scroll-behavior:smooth}
-#chat-box::-webkit-scrollbar{width:6px}
-#chat-box::-webkit-scrollbar-thumb{background:#3f3f46;border-radius:4px}
-.msg{padding:12px 16px;border-radius:12px;font-size:.95rem;max-width:85%; word-wrap: break-word;}
-.ai-msg{background:#18181b;border:1px solid #27272a;color:#d4d4d4;margin-right:auto}
-.user-msg{background:#2563eb;color:white;margin-left:auto;text-align:right}
+  body { 
+    background: #09090b; 
+    color: #e4e4e7; 
+    font-family: 'Inter', sans-serif; 
+    overflow: hidden; 
+  }
+  
+  /* Custom Scrollbar */
+  #chat-box { scroll-behavior: smooth; }
+  #chat-box::-webkit-scrollbar { width: 6px; }
+  #chat-box::-webkit-scrollbar-track { background: transparent; }
+  #chat-box::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+  /* Message Bubbles */
+  .msg { 
+    padding: 12px 16px; 
+    border-radius: 12px; 
+    font-size: 0.95rem; 
+    max-width: 85%; 
+    word-wrap: break-word; 
+    line-height: 1.6;
+    animation: fadeIn 0.3s ease;
+  }
+  
+  /* AI Bubble Styling */
+  .ai-msg { 
+    background: #18181b; 
+    border: 1px solid #27272a; 
+    color: #d4d4d4; 
+    margin-right: auto; 
+    border-bottom-left-radius: 2px;
+  }
+
+  /* AI Markdown Styling (Code blocks, etc) */
+  .ai-msg pre { background: #111; padding: 10px; border-radius: 6px; overflow-x: auto; margin-top: 10px; }
+  .ai-msg code { font-family: monospace; background: #222; padding: 2px 4px; border-radius: 4px; }
+  .ai-msg p { margin-bottom: 8px; }
+  .ai-msg p:last-child { margin-bottom: 0; }
+
+  /* User Bubble Styling */
+  .user-msg { 
+    background: #2563eb; 
+    color: white; 
+    margin-left: auto; 
+    text-align: right;
+    border-bottom-right-radius: 2px;
+  }
+  
+  /* Error Bubble */
+  .error-msg { background: #451a1a; color: #fca5a5; margin: auto; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 
 <body class="flex flex-col h-screen">
 
-<div class="border-b border-zinc-800 bg-zinc-950 p-4 flex justify-between items-center">
-  <h1 class="font-bold text-white tracking-tight">BEEF.<span class="text-green-500">AI</span></h1>
-  <div id="status" class="text-xs font-mono text-yellow-500">INITIALIZING...</div>
+<div class="border-b border-zinc-800 bg-zinc-950 p-4 flex justify-between items-center shadow-lg">
+  <div class="flex items-center gap-2">
+    <h1 class="font-bold text-white text-xl tracking-tight">BEEF.<span class="text-blue-500">AI</span></h1>
+  </div>
+  <div id="status" class="text-xs font-mono text-green-500">● ONLINE</div>
 </div>
 
 <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
-  <div class="ai-msg msg">Chat With BEEF</div>
-</div>
-
-<div class="p-4 bg-zinc-950 border-t border-zinc-800">
-  <div class="flex gap-2 max-w-3xl mx-auto">
-    <input id="user-input" type="text" disabled placeholder="Type a message..."
-      class="flex-1 bg-zinc-900 border border-zinc-700 text-white rounded-lg px-4 py-3 focus:outline-none">
-    <button id="send-btn" disabled
-      class="bg-blue-600 hover:bg-blue-500 text-white px-6 rounded-lg font-bold disabled:opacity-50">
-      Send
-    </button>
+  <div class="ai-msg msg">
+    Hello! I am Beef. How can I help you today?
   </div>
 </div>
 
-<script type="module">
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.16.0';
+<div class="p-4 bg-zinc-950 border-t border-zinc-800">
+  <form id="inputForm" class="flex gap-2 max-w-4xl mx-auto">
+    <input id="prompt" type="text" placeholder="Type a message..." autocomplete="off" required
+      class="flex-1 bg-zinc-900 border border-zinc-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors">
+    
+    <button type="submit" id="send-btn"
+      class="bg-blue-600 hover:bg-blue-500 text-white px-6 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      Send
+    </button>
+  </form>
+</div>
 
-// 1. Force Local Models off (saves downloading unnecessary configs)
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-
-const status = document.getElementById('status');
+<script>
 const chatBox = document.getElementById('chat-box');
-const userInput = document.getElementById('user-input');
+const inputForm = document.getElementById('inputForm');
+const promptInput = document.getElementById('prompt');
 const sendBtn = document.getElementById('send-btn');
+const statusDiv = document.getElementById('status');
 
-let generator;
-// 2. Strict History Cap (We will never store more than 6 items here)
-let history = []; 
-
-async function init() {
-  try {
-    // Loading the quantized version is crucial for RAM
-    generator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
-      quantized: true, 
-      progress_callback: d => {
-        if(d.status === 'progress') status.innerText = `DL: ${Math.round(d.progress)}%`;
-      }
-    });
-    status.innerText = "ONLINE";
-    status.classList.replace('text-yellow-500', 'text-green-500');
-    userInput.disabled = false;
-  } catch (e) {
-    status.innerText = "ERROR";
-    console.error(e);
+// Function to add messages to the screen
+function addMessage(text, type) {
+  const div = document.createElement('div');
+  
+  if (type === 'user') {
+    div.className = 'msg user-msg';
+    div.textContent = text;
+  } else if (type === 'ai') {
+    div.className = 'msg ai-msg';
+    // Use Marked.js to render code blocks and bold text
+    div.innerHTML = marked.parse(text);
+  } else if (type === 'error') {
+    div.className = 'msg error-msg';
+    div.textContent = text;
   }
+  
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return div;
 }
 
-function addMessage(text, isUser = false) {
-  const d = document.createElement("div");
-  d.className = isUser ? "msg user-msg" : "msg ai-msg";
-  d.innerText = text;
-  chatBox.appendChild(d);
+// Handle Form Submit
+inputForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const userText = promptInput.value.trim();
+  if (!userText) return;
+
+  // 1. Show User Message
+  addMessage(userText, 'user');
+  promptInput.value = '';
+  
+  // 2. Lock Interface
+  promptInput.disabled = true;
+  sendBtn.disabled = true;
+  statusDiv.textContent = "○ THINKING...";
+  statusDiv.className = "text-xs font-mono text-yellow-500";
+
+  // 3. Create a placeholder bubble for AI
+  const loadingBubble = document.createElement('div');
+  loadingBubble.className = 'msg ai-msg animate-pulse';
+  loadingBubble.textContent = "...";
+  chatBox.appendChild(loadingBubble);
   chatBox.scrollTop = chatBox.scrollHeight;
 
-  // 3. DOM Cleanup: If more than 30 messages, remove the oldest one to save RAM
-  if (chatBox.children.length > 30) {
-    chatBox.removeChild(chatBox.firstChild);
-  }
-  return d;
-}
-
-async function handleChat() {
-  const text = userInput.value.trim();
-  if (!text) return;
-
-  addMessage(text, true);
-  userInput.value = "";
-  userInput.disabled = true;
-  sendBtn.disabled = true;
-
-  // 4. Memory Management: Trim history array if it gets too big
-  if (history.length > 6) {
-      history = history.slice(-6);
-  }
-
-  // Build prompt
-  let prompt = `<|im_start|>system\nYou are a logical assistant. Answer casually.<|im_end|>\n`;
-  
-  // Only feed the last 2 exchanges to the AI to keep context small
-  history.slice(-2).forEach(m => {
-    prompt += `<|im_start|>user\n${m.user}<|im_end|>\n<|im_start|>assistant\n${m.ai}<|im_end|>\n`;
-  });
-  prompt += `<|im_start|>user\n${text}<|im_end|>\n<|im_start|>assistant\n`;
-
-  const loadingMsg = addMessage("Thinking...");
-
   try {
-    const out = await generator(prompt, {
-      max_new_tokens: 120,
-      temperature: 0.6,
-      do_sample: true,
-      // 5. CRITICAL: Disable Cache. 
-      // This prevents the AI from storing massive key/value tensors in RAM.
-      use_cache: false 
+    // 4. Send to Backend
+    const response = await fetch('http://localhost:3000/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: userText })
     });
+    
+    const data = await response.json();
 
-    let raw = out[0].generated_text;
-
-    // --- AGGRESSIVE CLEANING ---
-    const keyword = "assistant";
-    const lastIndex = raw.lastIndexOf(keyword);
-
-    let answer = raw;
-    if (lastIndex !== -1) {
-        answer = raw.substring(lastIndex + keyword.length);
+    // 5. Remove placeholder and show real response
+    chatBox.removeChild(loadingBubble);
+    
+    if (data.reply) {
+      addMessage(data.reply, 'ai');
+    } else {
+      addMessage('Error: No reply from server.', 'error');
     }
 
-    answer = answer.replace(/^[:\s\n]+/, "");
-    answer = answer.replace(/<\|im_end\|>/g, "");
-    // ---------------------------
-
-    loadingMsg.innerText = answer.trim();
-    history.push({ user: text, ai: answer.trim() });
-    
-    // 6. Manual cleanup suggestion for JS engine
-    raw = null; 
-    answer = null;
-
-  } catch (e) {
-    loadingMsg.innerText = "Error: " + e.message;
+  } catch (err) {
+    chatBox.removeChild(loadingBubble);
+    console.error(err);
+    addMessage('Error: Could not connect to server.', 'error');
+  } finally {
+    // 6. Unlock Interface
+    promptInput.disabled = false;
+    sendBtn.disabled = false;
+    promptInput.focus();
+    statusDiv.textContent = "● ONLINE";
+    statusDiv.className = "text-xs font-mono text-green-500";
   }
-
-  userInput.disabled = false;
-  sendBtn.disabled = false;
-  userInput.focus();
-}
-
-sendBtn.onclick = handleChat;
-userInput.onkeydown = e => { if(e.key === "Enter") handleChat(); }
-userInput.oninput = () => sendBtn.disabled = !userInput.value.trim();
-
-init();
+});
 </script>
+
 </body>
 </html>
